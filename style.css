@@ -1,0 +1,16 @@
+#navbar ul{
+    list-style: none;
+    display:inline-block;
+    width:100%;
+    margin:0px 0px;
+    padding:0px
+}
+#navbar li{
+    display:inline-block;
+    width:33%;
+    box-sizing: border-box;
+
+}
+#navbar li a{
+    align-items: center;
+}
