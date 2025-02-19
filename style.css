@@ -1,0 +1,11 @@
+.cards-container {
+    display: flex;
+    justify-content: center;  /* Centers items horizontally */
+    gap: 20px;  /* Adjusts the spacing between cards */
+    list-style: none;  /* Removes default list styling */
+    padding: 0;
+}
+
+.card{
+    width:100%;
+}
