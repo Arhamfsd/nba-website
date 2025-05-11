@@ -40,6 +40,16 @@ const feedbackSchema = new mongoose.Schema({
 
 const Feedback = mongoose.model('Feedback', feedbackSchema, 'feedback');
 
+// Chat Schema
+const chatSchema = new mongoose.Schema({
+    userEmail: String,
+    message: String,
+    isUser: Boolean,
+    timestamp: { type: Date, default: Date.now }
+});
+
+const Chat = mongoose.model('Chat', chatSchema, 'chat_messages');
+
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -251,6 +261,77 @@ app.post('/feedback', async (req, res) => {
         res.status(200).json({ message: 'Feedback received successfully!' });
     } catch (err) {
         console.error('Error saving feedback:', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Chat message endpoint
+app.post('/chat', async (req, res) => {
+    if (!isLoggedIn || !userEmail) {
+        return res.status(401).json({ message: 'Not logged in' });
+    }
+
+    try {
+        const { message } = req.body;
+
+        // Save user message
+        const userMessage = new Chat({
+            userEmail,
+            message,
+            isUser: true
+        });
+        await userMessage.save();
+
+        // Generate response based on message content
+        let responseMessage = "Thank you for your message. How can I help you further?";
+        
+        // Simple keyword-based responses
+        const lowerMessage = message.toLowerCase();
+        if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
+            responseMessage = "Hello! How can I assist you today?";
+        } else if (lowerMessage.includes('score') || lowerMessage.includes('game')) {
+            responseMessage = "You can check the latest scores on our Live Score page!";
+        } else if (lowerMessage.includes('team') || lowerMessage.includes('favorite')) {
+            responseMessage = "You can update your favorite team in your profile settings.";
+        } else if (lowerMessage.includes('help')) {
+            responseMessage = "I can help you with scores, team information, and general queries. What would you like to know?";
+        }
+
+        // Save bot response
+        const botMessage = new Chat({
+            userEmail,
+            message: responseMessage,
+            isUser: false
+        });
+        await botMessage.save();
+
+        res.json({
+            userMessage: {
+                message,
+                timestamp: userMessage.timestamp
+            },
+            botMessage: {
+                message: responseMessage,
+                timestamp: botMessage.timestamp
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Get chat history endpoint
+app.get('/chat-history', async (req, res) => {
+    if (!isLoggedIn || !userEmail) {
+        return res.status(401).json({ message: 'Not logged in' });
+    }
+
+    try {
+        const messages = await Chat.find({ userEmail })
+            .sort({ timestamp: 1 })
+            .limit(10); // Get last 10 messages
+        res.json(messages);
+    } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
