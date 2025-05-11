@@ -336,6 +336,147 @@ app.get('/chat-history', async (req, res) => {
     }
 });
 
+// Poll Schema
+const pollSchema = new mongoose.Schema({
+    question: String,
+    image: String,
+    options: [{
+        text: String,
+        votes: { type: Number, default: 0 }
+    }],
+    isActive: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now },
+    endTime: Date
+});
+
+const Poll = mongoose.model('Poll', pollSchema, 'polls');
+
+// User Vote Schema to track who voted for what
+const userVoteSchema = new mongoose.Schema({
+    userEmail: String,
+    pollId: mongoose.Schema.Types.ObjectId,
+    votedOption: Number,
+    votedAt: { type: Date, default: Date.now }
+});
+
+const UserVote = mongoose.model('UserVote', userVoteSchema, 'user_votes');
+
+// Get recent polls endpoint
+app.get('/polls', async (req, res) => {
+    try {
+        // Get 5 most recent completed polls
+        const completedPolls = await Poll.find({ isActive: false })
+            .sort({ createdAt: -1 })
+            .limit(5);
+
+        // Get active polls
+        const activePolls = await Poll.find({ isActive: true })
+            .sort({ createdAt: -1 });
+
+        res.json({
+            completedPolls,
+            activePolls
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Create new poll endpoint
+app.post('/polls', async (req, res) => {
+    if (!isLoggedIn || !userEmail) {
+        return res.status(401).json({ message: 'Not logged in' });
+    }
+
+    try {
+        const { question, image, options, duration } = req.body;
+        
+        // Calculate end time (duration in hours)
+        const endTime = new Date();
+        endTime.setHours(endTime.getHours() + duration);
+
+        const newPoll = new Poll({
+            question,
+            image,
+            options: options.map(opt => ({ text: opt, votes: 0 })),
+            endTime
+        });
+
+        await newPoll.save();
+        res.status(201).json({ message: 'Poll created successfully', poll: newPoll });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Vote on poll endpoint
+app.post('/polls/:pollId/vote', async (req, res) => {
+    if (!isLoggedIn || !userEmail) {
+        return res.status(401).json({ message: 'Not logged in' });
+    }
+
+    try {
+        const { pollId } = req.params;
+        const { optionIndex } = req.body;
+
+        // Check if poll exists and is active
+        const poll = await Poll.findById(pollId);
+        if (!poll) {
+            return res.status(404).json({ message: 'Poll not found' });
+        }
+        if (!poll.isActive) {
+            return res.status(400).json({ message: 'Poll is no longer active' });
+        }
+
+        // Check if user has already voted
+        const existingVote = await UserVote.findOne({
+            userEmail,
+            pollId
+        });
+
+        if (existingVote) {
+            return res.status(400).json({ message: 'You have already voted on this poll' });
+        }
+
+        // Record the vote
+        poll.options[optionIndex].votes += 1;
+        await poll.save();
+
+        // Record user's vote
+        const userVote = new UserVote({
+            userEmail,
+            pollId,
+            votedOption: optionIndex
+        });
+        await userVote.save();
+
+        res.json({ message: 'Vote recorded successfully', poll });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+});
+
+// Check and update poll status (to be called periodically)
+async function updatePollStatus() {
+    try {
+        const now = new Date();
+        const expiredPolls = await Poll.find({
+            isActive: true,
+            endTime: { $lt: now }
+        });
+
+        for (const poll of expiredPolls) {
+            poll.isActive = false;
+            await poll.save();
+        }
+    } catch (err) {
+        console.error('Error updating poll status:', err);
+    }
+}
+
+// Update poll status every minute
+setInterval(updatePollStatus, 60000);
+
 // Start server
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);

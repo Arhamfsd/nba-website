@@ -39,3 +39,14 @@ document.addEventListener('visibilitychange', () => {
             window.location.href = 'index.html';
         });
   }
+
+  function logout() {
+    fetch('http://localhost:3000/logout', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    }).then(() => {
+        window.location.reload();
+    });
+}

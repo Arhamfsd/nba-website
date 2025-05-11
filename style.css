@@ -1,4 +1,20 @@
-
+.poll-card.results { background: #ccc; }
+    .poll-card .option-bar {
+      height: 1.5rem;
+      background: #e0e0e0;
+      position: relative;
+    }
+    .poll-card .option-bar .fill {
+      height: 100%;
+      background: #007bff;
+    }
+    .poll-card .star {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      font-size: 1.5rem;
+      color: gold;
+    }
 .feedbackmain{
     justify-content: center;
     display: flex;
